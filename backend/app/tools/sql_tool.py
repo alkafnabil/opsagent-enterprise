@@ -172,8 +172,8 @@ class SQLQueryTool(BaseTool):
         cursor.execute("CREATE TABLE barges (id INT, barge_code TEXT, barge_name TEXT, tugboat_name TEXT, max_capacity_mt REAL, status TEXT);")
         cursor.execute("INSERT INTO barges VALUES (1, 'BG-301', 'BG Trans Coal 301', 'TB Rajawali 08', 8000.0, 'IN_TRANSIT');")
 
-        cursor.execute("CREATE TABLE barge_shipments (id INT, shipment_number TEXT, destination_port TEXT, status TEXT, coal_grade TEXT, tonnage_loaded_mt REAL);")
-        cursor.execute("INSERT INTO barge_shipments VALUES (1, 'SHP-2026-0401', 'Pelabuhan PLTU Suralaya', 'SAILING', 'GAR 4200', 7850.0);")
+        cursor.execute("CREATE TABLE barge_shipments (id INT, shipment_number TEXT, origin_jetty TEXT, destination_port TEXT, status TEXT, coal_grade TEXT, tonnage_loaded_mt REAL);")
+        cursor.execute("INSERT INTO barge_shipments VALUES (1, 'SHP-2026-0401', 'Palaran Jetty, Samarinda', 'Pelabuhan PLTU Suralaya', 'SAILING', 'GAR 4200', 7850.0);")
 
         cursor.execute("CREATE TABLE customers (id INT, customer_code TEXT, company_name TEXT, industry_type TEXT, payment_term_days INT);")
         cursor.execute("INSERT INTO customers VALUES (1, 'CUST-PLN-01', 'PT PLN Energi Primer Indonesia', 'PLTU', 45);")

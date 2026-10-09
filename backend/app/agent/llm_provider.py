@@ -60,12 +60,13 @@ class LLMProvider:
     async def _call_remote_router(self, query: str) -> Tuple[str, float]:
         system_prompt = (
             "Klasifikasikan intent pengguna ke dalam SALAH SATU label berikut:\n"
-            "- sql_query: pertanyaan data operasional (stok batubara, kapal tongkang, nama supplier/customer)\n"
-            "- erp_api: inquiry nomor PO, inquiry tagihan/invoice overdue, atau permintaan buat PO\n"
-            "- m365: jadwal rapat koordinasi, kalender kosong, atau draft email pengapalan/penagihan\n"
-            "- search_docs: SOP operasional, penanganan kebakaran batubara/self-combustion, prosedur cuaca hujan\n"
-            "- out_of_scope: topik di luar urusan operasional perusahaan\n\n"
-            "Jawab HANYA dalam format JSON: {\"intent\": \"...\", \"confidence\": 0.95}"
+            "- sql_query: pertanyaan data operasional batubara (stok batubara, pergerakan tongkang/kapal/barge, status/jadwal berlayar tongkang, tracking shipment ke PLTU, produksi pit tambang, nama supplier/customer)\n"
+            "- erp_api: inquiry tagihan/invoice overdue, pengecekan pembayaran, evaluasi kuota kontrak supplier, atau pembuatan draft Purchase Order (PO)\n"
+            "- m365: jadwal rapat internal/meeting koordinasi jetty, kalender kosong, atau draft memo/email\n"
+            "- search_docs: SOP operasional, penanganan kebakaran batubara/self-combustion, prosedur cuaca hujan/angin kencang, batas toleransi timbangan\n"
+            "- out_of_scope: topik umum di luar urusan operasional perusahaan (resep, zodiak, politik, dsb)\n\n"
+            "PENTING: Status dan jadwal pengiriman tongkang/barge batubara ke PLTU selalu masuk ke sql_query.\n"
+            "Jawab HANYA dalam format JSON valid: {\"intent\": \"...\", \"confidence\": 0.95}"
         )
         if self.provider == "groq":
             from groq import AsyncGroq
@@ -125,9 +126,10 @@ class LLMProvider:
         if any(w in q for w in sop_keywords):
             return "search_docs", 0.96
 
-        # 3. M365 check (Email & Calendar scheduling)
-        m365_keywords = ["jadwal", "rapat", "kalender", "meeting", "email", "draft email", "kirim email", "agenda", "slot kosong"]
-        if any(w in q for w in m365_keywords):
+        # 3. M365 check (Email & Meeting scheduling - exclude barge logistics)
+        is_barge_or_stock = any(k in q for k in ["tongkang", "barge", "kapal", "stok", "stockpile", "pltu", "suralaya", "pengiriman"])
+        m365_keywords = ["rapat", "kalender", "meeting", "email", "draft email", "kirim email", "agenda rapat", "slot kosong"]
+        if any(w in q for w in m365_keywords) or ("jadwal" in q and not is_barge_or_stock):
             return "m365", 0.95
 
         # 4. ERP check (Invoices, PO, Suppliers, Contracts)
