@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Operational Database with pgvector support
+  # ============================================================================
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: opsagent-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opsagent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsagent_password}
+      POSTGRES_DB: ${POSTGRES_DB:-opsagent_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./data/seed_sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opsagent} -d ${POSTGRES_DB:-opsagent_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opsagent-network
+
+  # ============================================================================
+  # Standalone Mock ERP Service (FastAPI)
+  # ============================================================================
+  mock_erp:
+    build:
+      context: ./mock_erp
+      dockerfile: Dockerfile
+    container_name: opsagent-mock-erp
+    restart: always
+    ports:
+      - "${MOCK_ERP_PORT:-8001}:8001"
+    environment:
+      MOCK_ERP_HOST: 0.0.0.0
+      MOCK_ERP_PORT: 8001
+      ERP_API_KEY: ${ERP_API_KEY:-mock-erp-secret-key-2026}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8001/health\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - opsagent-network
+
+  # ============================================================================
+  # OpsAgent Backend Service (FastAPI, LangGraph/Agent Loop, RAG)
+  # ============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: opsagent-backend
+    restart: always
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-opsagent}:${POSTGRES_PASSWORD:-opsagent_password}@db:5432/${POSTGRES_DB:-opsagent_db}
+      DATABASE_RO_URL: postgresql+psycopg2://${POSTGRES_USER:-opsagent}_ro:${POSTGRES_PASSWORD:-opsagent_password}_ro@db:5432/${POSTGRES_DB:-opsagent_db}
+      ERP_BASE_URL: http://mock_erp:8001/api/v1
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data:ro
+      - chroma_data:/app/chroma_data
+    depends_on:
+      db:
+        condition: service_healthy
+      mock_erp:
+        condition: service_healthy
+    networks:
+      - opsagent-network
+
+  # ============================================================================
+  # OpsAgent Frontend Service (React + Vite + Tailwind)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: opsagent-frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - opsagent-network
+
+volumes:
+  pgdata:
+    driver: local
+  chroma_data:
+    driver: local
+
+networks:
+  opsagent-network:
+    driver: bridge
