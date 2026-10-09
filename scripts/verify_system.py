@@ -43,10 +43,13 @@ def verify_all():
 
     # 3. RAG Pipeline & ChromaDB Collection
     try:
-        from app.rag.vector_store import ChromaVectorStore
-        store = ChromaVectorStore()
-        doc_count = store.collection.count()
-        checks.append(("ChromaDB Vector Store & Embeddings", True, f"{doc_count} chunks indexed in cosine space"))
+        from app.rag.pipeline import RAGPipeline
+        pipeline = RAGPipeline()
+        doc_count = pipeline.vector_store.count()
+        if doc_count == 0:
+            res = pipeline.ingest_directory()
+            doc_count = res.total_chunks
+        checks.append(("ChromaDB Vector Store & Embeddings", doc_count > 0, f"{doc_count} chunks indexed in cosine space"))
     except Exception as e:
         checks.append(("ChromaDB Vector Store", False, str(e)))
 

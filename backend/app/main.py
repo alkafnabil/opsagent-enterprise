@@ -52,6 +52,20 @@ app.include_router(chat_router, prefix="/api")
 app.include_router(approval_router, prefix="/api")
 
 
+@app.on_event("startup")
+async def startup_event():
+    import logging
+    logger = logging.getLogger("uvicorn.info")
+    try:
+        from app.rag.pipeline import RAGPipeline
+        pipeline = RAGPipeline()
+        if pipeline.vector_store.count() == 0:
+            res = pipeline.ingest_directory()
+            logger.info(f"OpsAgent Startup: Auto-indexed {res.total_chunks} SOP document chunks into ChromaDB.")
+    except Exception as exc:
+        logger.warning(f"OpsAgent Startup indexing notice: {exc}")
+
+
 
 if __name__ == "__main__":
     import uvicorn
